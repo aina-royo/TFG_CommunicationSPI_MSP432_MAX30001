@@ -24,7 +24,7 @@
  *            |                 |
  *
  * Author: Timothy Logan
-*******************************************************************************/
+ *******************************************************************************/
 
 /* DriverLib Includes */
 #include <driverlib.h>
@@ -67,11 +67,5 @@ void init_uart(void)
 
     /* Enable UART module */
     UART_enableModule(EUSCI_A0_BASE);
-
-    /* Enabling interrupts */
-    UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
-    UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
-    Interrupt_enableInterrupt(INT_EUSCIA0);
-    Interrupt_enableSleepOnIsrExit();
 }
 

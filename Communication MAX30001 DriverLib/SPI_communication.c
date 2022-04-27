@@ -75,10 +75,4 @@ void init_spi(void)
 
     /* Enable SPI module */
     SPI_enableModule(EUSCI_B2_BASE);
-
-    /* Enabling interrupts */
-    SPI_enableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT);
-    SPI_enableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_RECEIVE_INTERRUPT);
-    Interrupt_enableInterrupt(INT_EUSCIB2);
-    Interrupt_enableSleepOnIsrExit();
 }
