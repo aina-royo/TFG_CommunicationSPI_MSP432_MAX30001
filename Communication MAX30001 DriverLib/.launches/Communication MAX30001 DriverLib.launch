@@ -4,7 +4,7 @@
 <stringAttribute key="com.ti.ccstudio.debug.debugModel.ATTR_PROGRAM.MSP432P401R.ccxml.Texas Instruments XDS110 USB Debug Probe/CORTEX_M4_0" value="${build_artifact:Communication MAX30001 DriverLib}"/>
 <stringAttribute key="com.ti.ccstudio.debug.debugModel.ATTR_PROJECT.MSP432P401R.ccxml.Texas Instruments XDS110 USB Debug Probe/CORTEX_M4_0" value="Communication MAX30001 DriverLib"/>
 <stringAttribute key="com.ti.ccstudio.debug.debugModel.ATTR_TARGET_CONFIG" value="${target_config_active_default:Communication MAX30001 DriverLib}"/>
-<stringAttribute key="com.ti.ccstudio.debug.debugModel.MRU_PROGRAM.MSP432P401R.ccxml.Texas Instruments XDS110 USB Debug Probe/CORTEX_M4_0" value="C:\Users\ainar\workspace_v10\Communication MAX30001 DriverLib\Debug\Communication MAX30001 DriverLib.out"/>
+<stringAttribute key="com.ti.ccstudio.debug.debugModel.MRU_PROGRAM.MSP432P401R.ccxml.Texas Instruments XDS110 USB Debug Probe/CORTEX_M4_0" value="C:\Users\ainar\OneDrive - Universitat de Barcelona\Documentos\UNI\TFG\codi SPI\TFG_CommunicationSPI_MSP432_MAX30001\Communication MAX30001 DriverLib\Debug\Communication MAX30001 DriverLib.out"/>
 <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
 <listEntry value="/Communication MAX30001 DriverLib"/>
 </listAttribute>

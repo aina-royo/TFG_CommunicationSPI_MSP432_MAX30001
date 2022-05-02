@@ -17,7 +17,7 @@
  * wants to use EUSCIA for SPI operation, they are able to with the same APIs
  * with the EUSCI_AX parameters.
  *
- * ACLK = ~32.768kHz, MCLK = SMCLK = DCO 3MHz
+ * ACLK = ~32.768kHz, MCLK = SMCLK = DCO 24MHz
  *
  * Use with SPI Slave Data Echo code example.
  *
@@ -51,8 +51,8 @@
 const eUSCI_SPI_MasterConfig spiMasterConfig =
 {
         EUSCI_B_SPI_CLOCKSOURCE_SMCLK,                              // SMCLK Clock Source
-        24000000,                                                   // SMCLK = DCO = 3MHZ
-        3000000,                                                    // SPICLK = 500khz 500000
+        24000000,                                                   // SMCLK = DCO = 3MHZ (24MHz)
+        3000000,                                                    // SPICLK = 500khz 500000 (3MHz)
         EUSCI_B_SPI_MSB_FIRST,                                      // MSB First
         EUSCI_B_SPI_PHASE_DATA_CHANGED_ONFIRST_CAPTURED_ON_NEXT,    // Phase CPHA = 0
         EUSCI_B_SPI_CLOCKPOLARITY_INACTIVITY_LOW,                   // Low polarity CPOL = 0

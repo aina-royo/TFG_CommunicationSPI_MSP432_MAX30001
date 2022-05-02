@@ -39,18 +39,17 @@ uint8_t DataReceived[3];    // buffer where we keep the data we receive from SPI
 uint8_t fifo_ECG = 0x1F;    // 0 1 0   0 0 0 0 | 1 ultim 1 per indicar lectura seria 0x43 0x20+read 1 BURST MODE
 uint8_t fifo_BioZ = 0x45;   // 0 1 0   0 0 1 0 | 1 ultim 1 per indicar lectura seria 0x47 BURST MODE
 
-uint8_t Flag_ecgbioz = 0;
+uint8_t Flag_ecgbioz;
 
 int main(void)
 {
-    //EUSCI_B_CTLW0_STEM
-
     /* Halting the watchdog */
     WDT_A_holdTimer();
 
     init_uart();
     init_spi();
 
+    Flag_ecgbioz = 0;
 
     while (1)
     {
@@ -59,7 +58,6 @@ int main(void)
             /* Enabling interrupts */
             UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
             Interrupt_enableInterrupt(INT_EUSCIA0);
-            Interrupt_enableSleepOnIsrExit();
         }
         else if(Flag_ecgbioz == 1 && Flag_ecgbioz == 2)
         {
@@ -67,15 +65,12 @@ int main(void)
             SPI_enableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT);
             SPI_enableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_RECEIVE_INTERRUPT);
             Interrupt_enableInterrupt(INT_EUSCIB2);
-            Interrupt_enableSleepOnIsrExit();
         }
         else if(Flag_ecgbioz == 3)
         {
             /* Enabling interrupts */
             UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
             Interrupt_enableInterrupt(INT_EUSCIA0);
-            Interrupt_enableSleepOnIsrExit();
-
         }
         else
         {
@@ -128,7 +123,6 @@ void EUSCIB2_IRQHandler(void)
     }
     else if(Flag_ecgbioz == 2)
     {
-
         /**********************SECOND COMMUNICATION WITH BIOZ SIGNAL**********************************/
 
         GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
@@ -157,7 +151,7 @@ void EUSCIB2_IRQHandler(void)
     }
     else
     {
-        /*NOT IDEA CUELGATE*/
+        while(1);         /*NOT IDEA CUELGATE*/
     }
 }
 

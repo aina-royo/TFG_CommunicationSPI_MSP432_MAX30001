@@ -22,68 +22,34 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define NUMBER_TIMER_CAPTURES
+uint32_t valueSMCLK;
 
-/* Timer_A Continuous Mode Configuration Parameter */
-const Timer_A_ContinuousModeConfig continuousModeConfig =
+/* Timer_A UpMode Configuration Parameter */
+const Timer_A_UpModeConfig upModeConfig =
 {
-        TIMER_A_CLOCKSOURCE_SMCLK,           // SMCLK Clock Source
-        TIMER_A_CLOCKSOURCE_DIVIDER_1,       // SMCLK/1 = 3MHz
-        TIMER_A_TAIE_INTERRUPT_DISABLE,      // Disable Timer ISR
-        TIMER_A_SKIP_CLEAR                   // Skip Clear Counter
+        TIMER_A_CLOCKSOURCE_SMCLK,              // SMCLK Clock Source 24MHz
+        TIMER_A_CLOCKSOURCE_DIVIDER_1,          // SMCLK/1 = 24 MHz-> TIMER_A_CLOCKSOURCE_DIVIDER_8 -> 3MHz
+        8,                                      // 5000 tick period
+        TIMER_A_TAIE_INTERRUPT_DISABLE,         // Disable Timer interrupt
+        TIMER_A_CCIE_CCR0_INTERRUPT_ENABLE,     // Enable CCR0 interrupt
+        TIMER_A_DO_CLEAR                        // Clear value
 };
 
-/* Timer_A Capture Mode Configuration Parameter */
-const Timer_A_CaptureModeConfig captureModeConfig =
-{
-        TIMER_A_CAPTURECOMPARE_REGISTER_1,        // CC Register 2
-        TIMER_A_CAPTUREMODE_RISING_EDGE,          // Rising Edge
-        TIMER_A_CAPTURE_INPUTSELECT_CCIxB,        // CCIxB Input Select
-        TIMER_A_CAPTURE_SYNCHRONOUS,              // Synchronized Capture
-        TIMER_A_CAPTURECOMPARE_INTERRUPT_ENABLE,  // Enable interrupt
-        TIMER_A_OUTPUTMODE_OUTBITVALUE            // Output bit value
-};
-
-/* Statics */
-static volatile uint_fast16_t timerAcaptureValues[NUMBER_TIMER_CAPTURES];
 
 void init_clock(void)
 {
-    /* Setting ACLK = VLO = 14kHz */
-    CS_initClockSignal(CS_ACLK, CS_VLOCLK_SELECT, CS_CLOCK_DIVIDER_1);
+    CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_24); //sets the DCOCLK to 24MHz
+    CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
+    CS_initClockSignal(CS_MCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
 
-    /* Configuring Capture Mode */
-    Timer_A_initCapture(TIMER_A0_BASE, &captureModeConfig);
+    valueSMCLK = CS_getSMCLK();
 
-    /* Configuring Continuous Mode */
-    Timer_A_configureContinuousMode(TIMER_A0_BASE, &continuousModeConfig);
+    /* Configuring Timer_A1 for Up Mode */
+    Timer_A_configureUpMode(TIMER_A1_BASE, &upModeConfig);
 
-    /* Enabling interrupts and going to sleep */
+    /* Enabling interrupts and starting the timer */
     Interrupt_enableSleepOnIsrExit();
-    Interrupt_enableInterrupt(INT_TA0_N);
-    Interrupt_enableMaster();
-
-    /* Starting the Timer_A0 in continuous mode */
-    Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_CONTINUOUS_MODE);
+    Interrupt_enableInterrupt(INT_TA1_0);
+    Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
 }
 
-//******************************************************************************
-//
-//This is the TIMERA interrupt vector service routine.
-//
-//******************************************************************************
-void timer_a_ccr_isr(void)
-{
-    uint32_t jj;
-    static volatile uint32_t timerAcapturePointer = 0;
-
-    timerAcaptureValues[timerAcapturePointer++] = Timer_A_getCaptureCompareCount(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_1);
-
-    /*if(timerAcapturePointer >= NUMBER_TIMER_CAPTURES)
-    {
-        while(1)
-        {
-            for(jj=0;jj<10000;jj++);
-        }
-    }*/
-}
