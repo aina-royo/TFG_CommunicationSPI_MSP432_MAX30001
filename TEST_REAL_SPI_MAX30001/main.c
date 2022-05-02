@@ -69,10 +69,18 @@
 #define   BIOZ_FIFO_BURST 0x45
 #define   BIOZ_FIFO       0x47
 
+#define   DELAY_1s        1000000
+#define   DELAY_1ms       1000
+#define   DELAY_100ms     100000
+
 
 /* Statics */
-uint8_t DataEcg[3];         // buffer on emmagatzemem les dades de lectura de ECG 3 byte data word
-uint8_t DataBioZ[3];        // buffer on emmagatzemem les dades de lectura del BioZ 3 byte data word
+//uint8_t DataEcg[3];         // buffer on emmagatzemem les dades de lectura de ECG 3 byte data word
+//uint8_t DataBioZ[3];        // buffer on emmagatzemem les dades de lectura del BioZ 3 byte data word
+uint8_t DataRecieved[3];
+
+uint32_t DataBioZ;
+uint32_t DataEcg;
 
 uint8_t Flag_ecgbioz;
 
@@ -97,6 +105,9 @@ int main(void)
     CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1); // 24000000 Hz
 
     init_delay();
+
+    DataEcg = 0;
+    DataBioZ = 0;
 
     Flag_ecgbioz = 1;
 
@@ -126,27 +137,110 @@ int main(void)
     }
 }
 
-void max30001SwReset(void)
+void max30001_RegWrite(uint8_t write_addr, uint32_t data_send)
 {
-    /**********************FIRST COMMUNICATION WITH ECG SIGNAL************************************/
-        GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
 
-        /* Send the next data packet */
+    /* Send the register we desire to communicate with */
+    delay(2*DELAY_1ms);
+    SPI_transmitData(EUSCI_B2_BASE, write_addr);
 
-        SPI_transmitData(EUSCI_B2_BASE, SW_RST);     // send the register to make a reset
+    /* Send the value desired */
+    SPI_transmitData(EUSCI_B2_BASE, data_send >> 16);
+    SPI_transmitData(EUSCI_B2_BASE, data_send >> 8);
+    SPI_transmitData(EUSCI_B2_BASE, data_send);
+    delay(2*DELAY_1ms);
 
-        while (!(SPI_getInterruptStatus(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT)));
+    GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
+}
 
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataEcg[0] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
+void max30001_RegRead(uint8_t reg_addr, uint8_t *data_recieved)
+{
+    uint8_t i;
 
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataEcg[1] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
 
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataEcg[2] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
+    SPI_transmitData(EUSCI_B2_BASE, reg_addr);     // Send register location
 
-        GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
+    for(i = 0; i < 3; i++)
+    {
+       SPI_transmitData(EUSCI_B2_BASE, 0xFF);
+       data_recieved[i] = SPI_receiveData(EUSCI_B2_BASE);
+    }
+
+    GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
+}
+
+void max30001_SwReset(void)
+{
+    max30001_RegWrite(SW_RST, 0x000000);
+    delay(DELAY_100ms);                            // Delay post reset communication
+}
+
+
+void max30001_ReadInfo(void)
+{
+    uint8_t InfoRecieved[3];
+
+    max30001_RegRead(INFO, InfoRecieved);
+
+    InfoRecieved = InfoRecieved >>
+
+    if(InfoRecieved )
+
+
+
+
+}
+void max30001_Calibration(void)
+{
+    /***************************WE START CALIBRATING THE DEVICE**********************************/
+    max30001_SwReset();
+    delay(DELAY_100ms);
+
+    max30001_RegWrite(CNFG_GEN, 0x0E0017);
+    delay(DELAY_100ms);
+
+    max30001_RegWrite(CNFG_CAL, 0x004800);
+    delay(DELAY_100ms);
+
+    max30001_RegWrite(CNFG_EMUX, 0x000000);
+    delay(DELAY_100ms);
+
+    max30001_RegWrite(CNFG_ECG, 0x805000);
+    delay(DELAY_100ms);
+
+    max30001_RegWrite(CNFG_BMUX, 0x001040);
+    delay(DELAY_100ms);
+
+    max30001_RegWrite(CNFG_BIOZ, 0x201130);
+    delay(DELAY_100ms);
+}
+
+uint32_t max30001_getEcgValue(void)
+{
+    uint32_t data0, data1, data2;
+
+    max30001_RegRead(ECG_FIFO, DataRecieved);
+
+    data0 = (DataRecieved[0] << 24) & 0xF00;
+    data1 = (DataRecieved[1] << 16) & 0x0F0;
+    data2 = (DataRecieved[2] >> 6) & 0x00F;
+
+    return DataEcg = data0 | data1 | data2;            // real value of the ECG data
+}
+
+uint32_t max30001_getBioZValue(void)
+{
+    uint32_t data0, data1, data2;
+
+    max30001_RegRead(BIOZ_FIFO, DataRecieved);
+
+    data0 = (DataRecieved[0] << 24) & 0xF00;
+    data1 = (DataRecieved[1] << 16) & 0x0F0;
+    data2 = (DataRecieved[2] >> 4) & 0x00F;
+
+    return DataBioZ = data0 | data1 | data2;            // real value of the ECG data
 }
 
 //******************************************************************************
@@ -159,8 +253,6 @@ void EUSCIB2_IRQHandler(void)
     uint32_t status = SPI_getEnabledInterruptStatus(EUSCI_B2_BASE);
 
     SPI_clearInterruptFlag(EUSCI_B2_BASE, status);
-
-    while ((SPI_isBusy(EUSCI_B2_BASE)==EUSCI_SPI_BUSY));
 
     if(Flag_ecgbioz == 1)
     {
