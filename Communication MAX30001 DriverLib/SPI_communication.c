@@ -45,6 +45,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "SPI_communication.h"
+#include "delay.h"
 
 
 /* SPI Master Configuration Parameter */
@@ -75,4 +76,110 @@ void init_spi(void)
 
     /* Enable SPI module */
     SPI_enableModule(EUSCI_B2_BASE);
+}
+
+
+void max30001_RegWrite(uint8_t write_addr, uint32_t data_send)
+{
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
+
+    /* Send the register we desire to communicate with */
+    delay(2); // 2us of delay
+    SPI_transmitData(EUSCI_B2_BASE, write_addr);
+
+    /* Send the value desired */
+    SPI_transmitData(EUSCI_B2_BASE, data_send >> 16);
+    SPI_transmitData(EUSCI_B2_BASE, data_send >> 8);
+    SPI_transmitData(EUSCI_B2_BASE, data_send);
+    delay(2); // 2us of delay
+
+    GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
+}
+
+void max30001_RegRead(uint8_t reg_addr, uint8_t *data_recieved)
+{
+    uint8_t i;
+
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
+
+    SPI_transmitData(EUSCI_B2_BASE, reg_addr);     // Send register location
+
+    for(i = 0; i < 3; i++)
+    {
+       SPI_transmitData(EUSCI_B2_BASE, 0xFF);
+       data_recieved[i] = SPI_receiveData(EUSCI_B2_BASE);
+    }
+
+    GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
+}
+
+void max30001_SwReset(void)
+{
+    max30001_RegWrite(SW_RST, 0x000000);
+    delay(100);                            // Delay post reset communication 100 us
+}
+
+void max30001_ReadInfo(void)
+{
+    uint8_t InfoRecieved[3];
+
+    max30001_RegRead(INFO, InfoRecieved);
+
+    /*InfoRecieved = InfoRecieved >> 0x01;
+
+    if(InfoRecieved )
+    {
+
+    }*/
+}
+
+void max30001_Calibration(void)
+{
+    /***************************WE START CALIBRATING THE DEVICE**********************************/
+    max30001_SwReset();
+    delay(100);         // delay of 100 us
+
+    max30001_RegWrite(CNFG_GEN, 0x0E0017);
+    delay(100);
+
+    max30001_RegWrite(CNFG_CAL, 0x004800);
+    delay(100);
+
+    max30001_RegWrite(CNFG_EMUX, 0x000000);
+    delay(100);
+
+    max30001_RegWrite(CNFG_ECG, 0x805000);
+    delay(100);
+
+    max30001_RegWrite(CNFG_BMUX, 0x001040);
+    delay(100);
+
+    max30001_RegWrite(CNFG_BIOZ, 0x201130);
+    delay(100);
+}
+
+uint32_t max30001_getEcgValue(void)
+{
+    uint32_t data0, data1, data2;
+
+    max30001_RegRead(ECG_FIFO, DataRecieved);
+
+    data0 = (DataRecieved[0] << 24) & 0xF00;
+    data1 = (DataRecieved[1] << 16) & 0x0F0;
+    data2 = (DataRecieved[2] >> 6) & 0x00F;
+
+    return DataEcg = data0 | data1 | data2;            // real value of the ECG data
+}
+
+uint32_t max30001_getBioZValue(void)
+{
+    uint32_t data0, data1, data2;
+
+    max30001_RegRead(BIOZ_FIFO, DataRecieved);
+
+    data0 = (DataRecieved[0] << 24) & 0xF00;
+    data1 = (DataRecieved[1] << 16) & 0x0F0;
+    data2 = (DataRecieved[2] >> 4) & 0x00F;
+
+    return DataBioZ = data0 | data1 | data2;            // real value of the ECG data
 }

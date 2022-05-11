@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include "UART_COM_PORT.h"
 #include "SPI_communication.h"
+#include "delay.h"
 
 /* DIFFERENTS ECG OR BIOZ DATA TAGS */
 #define VALID       0x00
@@ -32,12 +33,10 @@
 #define OVERFLOW    0x07
 
 /* Statics */
-uint8_t DataEcg[3];         // buffer on emmagatzemem les dades de lectura de ECG 3 byte data word
-uint8_t DataBioZ[3];        // buffer on emmagatzemem les dades de lectura del BioZ 3 byte data word
 uint8_t DataReceived[3];    // buffer where we keep the data we receive from SPI communication
 
-uint8_t fifo_ECG = 0x1F;    // 0 1 0   0 0 0 0 | 1 ultim 1 per indicar lectura seria 0x43 0x20+read 1 BURST MODE
-uint8_t fifo_BioZ = 0x45;   // 0 1 0   0 0 1 0 | 1 ultim 1 per indicar lectura seria 0x47 BURST MODE
+uint32_t DataBioZ;
+uint32_t DataEcg;
 
 uint8_t Flag_ecgbioz;
 
@@ -45,10 +44,15 @@ int main(void)
 {
     /* Halting the watchdog */
     WDT_A_holdTimer();
+    CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_24);                    // 24000000 Hz
+    CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1); // 24000000 Hz
 
+    init_delay();
     init_uart();
     init_spi();
 
+    DataEcg = 0;
+    DataBioZ = 0;
     Flag_ecgbioz = 0;
 
     while (1)
@@ -62,9 +66,7 @@ int main(void)
         else if(Flag_ecgbioz == 1 && Flag_ecgbioz == 2)
         {
             /* Enabling interrupts SPI */
-            SPI_enableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT);
-            SPI_enableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_RECEIVE_INTERRUPT);
-            Interrupt_enableInterrupt(INT_EUSCIB2);
+
         }
         else if(Flag_ecgbioz == 3)
         {

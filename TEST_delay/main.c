@@ -38,7 +38,7 @@ int main(void)
 
     while(1)
     {
-        delay(1 * 1000); // 1s --> 1ms * 1000 --> 1ns (* 1000)x2
+        delay(1 * 1000); // 1s (* 1000)x2 --> 1ms * 1000 --> 1us
 
         GPIO_toggleOutputOnPin(GPIO_PORT_P3, GPIO_PIN3);
     }

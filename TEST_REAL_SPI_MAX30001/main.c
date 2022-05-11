@@ -101,7 +101,7 @@ int main(void)
     /* Halting the watchdog */
     WDT_A_holdTimer();
 
-    CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_24);                   // 24000000 Hz
+    CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_24);                    // 24000000 Hz
     CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1); // 24000000 Hz
 
     init_delay();
@@ -184,14 +184,14 @@ void max30001_ReadInfo(void)
 
     max30001_RegRead(INFO, InfoRecieved);
 
-    InfoRecieved = InfoRecieved >>
+    /*InfoRecieved = InfoRecieved >> 0x01;
 
     if(InfoRecieved )
+    {
 
-
-
-
+    }*/
 }
+
 void max30001_Calibration(void)
 {
     /***************************WE START CALIBRATING THE DEVICE**********************************/
@@ -259,22 +259,23 @@ void EUSCIB2_IRQHandler(void)
         /**********************FIRST COMMUNICATION WITH ECG SIGNAL************************************/
         GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
 
+        delay(2);                                // 2us || 11.5 us de delay
         /* Send the next data packet */
-        SPI_transmitData(EUSCI_B2_BASE, INFO);     // send the register to read the raw data of ECG
+        SPI_transmitData(EUSCI_B2_BASE, 0x43);     // send the register to read the raw data of ECG
+        //delay(6);
+        //while (!(SPI_getInterruptStatus(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT)));
 
-        while (!(SPI_getInterruptStatus(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT)));
-
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataEcg[0] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
-        //delay(11500);                               // 1s (* 1000)x2 --> 1ms * 1000 --> 1ns || 11.5 us de delay
-
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataEcg[1] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
-        //delay(11500);                               // 1s (* 1000)x2 --> 1ms * 1000 --> 1ns || 11.5 us de delay
+        SPI_transmitData(EUSCI_B2_BASE, 0xFF);              // we don't care, we just need clock signal
+        //DataRecieved[0] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
+        //delay(6);
 
         SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataEcg[2] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
-        //delay(11500);                               // 1s (* 1000)x2 --> 1ms * 1000 --> 1ns || 11.5 us de delay
+        //DataRecieved[1] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
+        //delay(6);
+        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
+        //DataRecieved[2] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
+
+        delay(2);                                  // 2us
 
         GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
 
@@ -292,13 +293,13 @@ void EUSCIB2_IRQHandler(void)
         while (!(SPI_getInterruptStatus(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT)));
 
         SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataBioZ[0] = SPI_receiveData(EUSCI_B2_BASE);  // we receive the data
+        DataRecieved[0] = SPI_receiveData(EUSCI_B2_BASE);  // we receive the data
 
         SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataBioZ[1] = SPI_receiveData(EUSCI_B2_BASE);  // we receive the data
+        DataRecieved[1] = SPI_receiveData(EUSCI_B2_BASE);  // we receive the data
 
         SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataBioZ[2] = SPI_receiveData(EUSCI_B2_BASE);  // we receive the data
+        DataRecieved[2] = SPI_receiveData(EUSCI_B2_BASE);  // we receive the data
 
         GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
 
