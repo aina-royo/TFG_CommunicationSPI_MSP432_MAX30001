@@ -22,28 +22,23 @@
 #include "SPI_communication.h"
 #include "delay.h"
 
-/* DIFFERENTS ECG OR BIOZ DATA TAGS */
-#define VALID       0x00
-#define FAST        0x01
-#define VALID_EOF   0x02
-#define FAST_EOF    0x03
-#define UNUSED_1    0x04
-#define UNUSED_2    0x05
-#define EMPTY       0x06
-#define OVERFLOW    0x07
-
-/* Statics */
-uint8_t DataReceived[3];    // buffer where we keep the data we receive from SPI communication
+uint8_t DataReceivedCom[3];
 
 uint32_t DataBioZ;
 uint32_t DataEcg;
 
 uint8_t Flag_ecgbioz;
+uint8_t value;
+
+
+bool info;
 
 int main(void)
 {
     /* Halting the watchdog */
     WDT_A_holdTimer();
+
+    /* Set the clock frecuency */
     CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_24);                    // 24000000 Hz
     CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1); // 24000000 Hz
 
@@ -53,31 +48,64 @@ int main(void)
 
     DataEcg = 0;
     DataBioZ = 0;
+
+    /* Enabling recieve UART interrupt always */
+    UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
+    Interrupt_enableInterrupt(INT_EUSCIA0);
+
+    info = max30001_ReadInfo();
+
+    if(info==1)
+    {
+        /* READ INFO IS CORRECT */
+    }
+    else
+    {
+        while(info==0)
+        {
+            /* Stay here untill the issue is fixed */
+            info = max30001_ReadInfo();
+            delay(10000); // 10 ms
+        }
+    }
+
+    value = 0;
     Flag_ecgbioz = 0;
+
 
     while (1)
     {
-        if(Flag_ecgbioz == 0)
+        switch(value)
         {
-            /* Enabling interrupts */
-            UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
-            Interrupt_enableInterrupt(INT_EUSCIA0);
-        }
-        else if(Flag_ecgbioz == 1 && Flag_ecgbioz == 2)
-        {
-            /* Enabling interrupts SPI */
+        case 1:
+            if(Flag_ecgbioz == 0)
+            {
+                max30001_CalibrationECG();
+                delay(100);
+                Flag_ecgbioz = 1;
+            }
 
-        }
-        else if(Flag_ecgbioz == 3)
-        {
-            /* Enabling interrupts */
-            UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
-            Interrupt_enableInterrupt(INT_EUSCIA0);
-        }
-        else
-        {
-            /* Sleeping when not in use */
-            PCM_gotoLPM0();
+            DataEcg = max30001_getEcgValue();
+            UART_transmitData(EUSCI_A0_BASE, DataEcg >> 8);
+
+            delay(10);
+            break;
+        case 2:
+            if(Flag_ecgbioz == 1)
+            {
+                max30001_CalibrationBioZ();
+                delay(100);
+                Flag_ecgbioz = 0;
+            }
+
+            DataBioZ = max30001_getBioZValue();
+            UART_transmitData(EUSCI_A0_BASE, DataBioZ >> 8);
+
+            delay(15);
+            break;
+        default:
+
+            break;
         }
     }
 }
@@ -90,71 +118,8 @@ int main(void)
 void EUSCIB2_IRQHandler(void)
 {
     uint32_t status = SPI_getEnabledInterruptStatus(EUSCI_B2_BASE);
-    uint32_t jj;
 
     SPI_clearInterruptFlag(EUSCI_B2_BASE, status);
-
-    while ((SPI_isBusy(EUSCI_B2_BASE)==EUSCI_SPI_BUSY));
-
-    if(Flag_ecgbioz == 1)
-    {
-        /**********************FIRST COMMUNICATION WITH ECG SIGNAL************************************/
-        GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
-
-        /* Send the next data packet */
-        SPI_transmitData(EUSCI_B2_BASE, fifo_ECG);     // send the register to read the raw data of ECG
-
-        while (!(SPI_getInterruptStatus(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT)));
-
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataReceived[0] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
-
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataReceived[1] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
-
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataReceived[2] = SPI_receiveData(EUSCI_B2_BASE);   // we receive the data
-
-        GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
-
-        SPI_disableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_RECEIVE_INTERRUPT);  // we disable the interrupt
-        SPI_disableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT); // we disable the interrupt
-
-        Flag_ecgbioz = 3;                                                    // reset the flag
-        /*******************************END FIRST COMMUNICATION***************************************/
-    }
-    else if(Flag_ecgbioz == 2)
-    {
-        /**********************SECOND COMMUNICATION WITH BIOZ SIGNAL**********************************/
-
-        GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
-
-        /* Send the next data packet */
-        SPI_transmitData(EUSCI_B2_BASE, fifo_BioZ);    // send the register to read the raw data of BioZ
-
-        while (!(SPI_getInterruptStatus(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT)));
-
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataReceived[0] = SPI_receiveData(EUSCI_B2_BASE);  // we receive the data
-
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataReceived[1] = SPI_receiveData(EUSCI_B2_BASE);  // we receive the data
-
-        SPI_transmitData(EUSCI_B2_BASE, 0xFF);         // we don't care, we just need clock signal
-        DataReceived[2] = SPI_receiveData(EUSCI_B2_BASE);  // we receive the data
-
-        GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
-
-        SPI_disableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_RECEIVE_INTERRUPT);  // we disable the interrupt
-        SPI_disableInterrupt(EUSCI_B2_BASE, EUSCI_B_SPI_TRANSMIT_INTERRUPT); // we disable the interrupt
-
-        Flag_ecgbioz = 3;                                                    // reset the flag
-        /*******************************END FIRST COMMUNICATION***************************************/
-    }
-    else
-    {
-        while(1);         /*NOT IDEA CUELGATE*/
-    }
 }
 
 //******************************************************************************
@@ -165,29 +130,14 @@ void EUSCIB2_IRQHandler(void)
 void EUSCIA0_IRQHandler(void)
 {
     uint32_t status = UART_getEnabledInterruptStatus(EUSCI_A0_BASE);
-    uint32_t jj;
 
     UART_clearInterruptFlag(EUSCI_A0_BASE, status);
 
-    //UART_transmitData(EUSCI_A0_BASE, 0x70);
 
     if(status & EUSCI_A_UART_RECEIVE_INTERRUPT)
     {
-        // if(status & EUSCI_A_UART_RECEIVE_INTERRUPT)
-        // UART_transmitData(EUSCI_A0_BASE, UART_receiveData(EUSCI_A0_BASE));
-
-        Flag_ecgbioz = UART_receiveData(EUSCI_A0_BASE);
+        value = UART_receiveData(EUSCI_A0_BASE);
         UART_disableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT); // disable the interrupt
     }
 
-    if(status & EUSCI_A_UART_TRANSMIT_INTERRUPT)
-    {
-        UART_transmitData(EUSCI_A0_BASE, DataReceived[0]);
-        UART_transmitData(EUSCI_A0_BASE, DataReceived[1]);
-        UART_transmitData(EUSCI_A0_BASE, DataReceived[2]);
-
-        Flag_ecgbioz = 0;                                                      // we reset ALL the communication
-
-        UART_disableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT); // disable the interrupt
-    }
 }

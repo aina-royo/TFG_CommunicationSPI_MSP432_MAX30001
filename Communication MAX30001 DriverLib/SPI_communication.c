@@ -47,6 +47,8 @@
 #include "SPI_communication.h"
 #include "delay.h"
 
+/* Statics */
+uint8_t DataRecieved[3];    // buffer where we keep the data we receive from SPI communication
 
 /* SPI Master Configuration Parameter */
 const eUSCI_SPI_MasterConfig spiMasterConfig =
@@ -77,7 +79,6 @@ void init_spi(void)
     /* Enable SPI module */
     SPI_enableModule(EUSCI_B2_BASE);
 }
-
 
 void max30001_RegWrite(uint8_t write_addr, uint32_t data_send)
 {
@@ -119,42 +120,83 @@ void max30001_SwReset(void)
     delay(100);                            // Delay post reset communication 100 us
 }
 
-void max30001_ReadInfo(void)
+void max30001_Synch(void)
 {
-    uint8_t InfoRecieved[3];
-
-    max30001_RegRead(INFO, InfoRecieved);
-
-    /*InfoRecieved = InfoRecieved >> 0x01;
-
-    if(InfoRecieved )
-    {
-
-    }*/
+    max30001_RegWrite(SYNCH, 0x000000);
 }
 
-void max30001_Calibration(void)
+bool max30001_ReadInfo(void)
+{
+    uint8_t InfoRecieved[4];
+    uint8_t i;
+
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, CS1);     // chip select low to start the transfer
+
+    SPI_transmitData(EUSCI_B2_BASE, INFO);         // Send register location
+
+    for(i = 0; i < 3; i++)
+    {
+       SPI_transmitData(EUSCI_B2_BASE, 0xFF);
+       InfoRecieved[i] = SPI_receiveData(EUSCI_B2_BASE);
+    }
+
+    GPIO_setOutputHighOnPin(GPIO_PORT_P2, CS1);    // chip select high
+
+    if((InfoRecieved[0] & 0xF0) == 0x50)
+    {
+        /* max30001 is ready */
+        return true;
+    }
+    else
+    {
+        /* max30001 read info error */
+        return false;
+    }
+}
+
+void max30001_CalibrationECG(void)
 {
     /***************************WE START CALIBRATING THE DEVICE**********************************/
     max30001_SwReset();
     delay(100);         // delay of 100 us
 
-    max30001_RegWrite(CNFG_GEN, 0x0E0017);
+    max30001_RegWrite(CNFG_GEN, 0x080017); // ECG channel enable. ECG Resistive Bias enabled. 100Mohms. ECGP/ECGN connected to Vmid through a resistor.
+    delay(100);
+
+    max30001_RegWrite(CNFG_CAL, 0x004800); // FCAL = Fmstr/2^15. THIGH = 50% CAL_THIGH are ignored.
+    delay(100);
+
+    max30001_RegWrite(CNFG_EMUX, 0x000000); // ECGP/ECGN is internally connected to the ECG AFE.
+    delay(100);
+
+    max30001_RegWrite(CNFG_ECG, 0x805000); // 128 sps. ECG_DHPF a 0.50 Hz. ECG_DLPF 28.35 Hz.
+    delay(100);
+
+    max30001_RegWrite(CNFG_RTOR1, 0x36A300);
+    max30001_Synch();
+    delay(100);
+}
+
+void max30001_CalibrationBioZ(void)
+{
+    /***************************WE START CALIBRATING THE DEVICE**********************************/
+    max30001_SwReset();
+    delay(100);         // delay of 100 us
+
+    max30001_RegWrite(CNFG_GEN, 0x040027);
     delay(100);
 
     max30001_RegWrite(CNFG_CAL, 0x004800);
-    delay(100);
-
-    max30001_RegWrite(CNFG_EMUX, 0x000000);
-    delay(100);
-
-    max30001_RegWrite(CNFG_ECG, 0x805000);
     delay(100);
 
     max30001_RegWrite(CNFG_BMUX, 0x001040);
     delay(100);
 
     max30001_RegWrite(CNFG_BIOZ, 0x201130);
+    delay(100);
+
+    max30001_RegWrite(CNFG_RTOR1, 0x3F2300);
+    max30001_Synch();
     delay(100);
 }
 
